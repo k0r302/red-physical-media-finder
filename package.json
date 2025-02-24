@@ -1,0 +1,23 @@
+{
+  "name": "red-physical-media-finder",
+  "version": "1.0.0",
+  "description": "Find purchase links, lowest prices and cost per GB for physical media requests on RED.",
+  "main": "src/red-rpmf.user.js",
+  "scripts": {
+    "lint": "eslint ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint-plugin-userscripts": "^1.0.0",
+    "@eslint/js": "^9.21.0",
+    "eslint": "^9.21.0",
+    "globals": "^16.0.0"
+  },
+  "keywords": [
+    "userscript",
+    "javascript",
+    "eslint"
+  ],
+  "author": "k0r302",
+  "license": "MIT"
+}
