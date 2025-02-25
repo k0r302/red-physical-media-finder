@@ -5,6 +5,7 @@ import globals from "globals";
 const customGlobals = {
   GM: "readable",
   GM_config: "readable",
+  currency: "readable",
 };
 
 export default [

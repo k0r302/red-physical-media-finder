@@ -1,6 +1,6 @@
 RED: Physical Media Finder for Music Requests
 =============================
-[View](https://greasyfork.org/en/scripts/527903-red-physical-media-finder-for-music-requests) | [Install](https://update.greasyfork.org/scripts/527903/RED%3A%20Physical%20Media%20Finder%20for%20Music%20Requests.user.js) | [Github](https://github.com/k0r302/red-physical-media-finder)
+[View Code](https://greasyfork.org/en/scripts/527903-red-physical-media-finder-for-music-requests/code) | [Install](https://update.greasyfork.org/scripts/527903/RED%3A%20Physical%20Media%20Finder%20for%20Music%20Requests.user.js) | [GitHub](https://github.com/k0r302/red-physical-media-finder)
 
 *Disclaimer: Always make sure to read the instructions, as well as the source code, of any user script you install.*
 
@@ -65,5 +65,8 @@ Please post your bugs and feature requests on the [project's Github page](https:
 
 Changelog
 ---------
+v1.0.1
+- Fix issues with non-US currencies, that would make the user script get stuck on "Searching...". Thanks @beats for reporting.
+
 v1.0.0
 - First release. Supports enhancing the requests.php view page with Discogs lowest price, cost per GB and release link.

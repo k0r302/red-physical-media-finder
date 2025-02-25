@@ -4,13 +4,14 @@
 // @author       k0r302
 // @homepage     https://github.com/k0r302/red-physical-media-finder/
 // @homepageURL  https://github.com/k0r302/red-physical-media-finder/
-// @version      1.0.0
+// @version      1.0.1
 // @grant        GM.xmlHttpRequest
 // @connect      discogs.com
 // @match        https://redacted.sh/requests.php?action=view&id=*
 // @run-at       document-end
 // @namespace    _
 // @require      https://openuserjs.org/src/libs/sizzle/GM_config.js
+// @require      https://unpkg.com/currency.js@~2.0.0/dist/currency.min.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM.getValue
@@ -44,6 +45,7 @@
 
   const request_id = new URL(window.location).searchParams.get('id')
   const promises = []
+  let pricesFound = 0;
 
   const decodeHTML = (orig) => {
     const txt = document.createElement('textarea')
@@ -56,7 +58,7 @@
       const res = await fetch(`${location.origin}/ajax.php?action=request&id=${request_id}`)
       return res.json()
     } catch (error) {
-      console.log(error)
+      console.error(error)
     }
   }
 
@@ -239,24 +241,27 @@
       doc
         .querySelectorAll(`[data-release-id="${releaseId}"] .item_price .converted_price`)
         .forEach((priceFoundOnDiscogsElement) => {
-          let price = priceFoundOnDiscogsElement.textContent
-            .replace(',', '') // Remove comma for larger prices ($2,140.99)
-            .match(/\$(\d+\.\d+)/)[1]
+          const priceString = Array.from(priceFoundOnDiscogsElement.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE) // Only get text nodes
+            .map(node => node.textContent.trim()) // Trim spaces
+            .join(" ")
 
+          let price = currency(priceString)
           // Skip all disc prices that are available on discogs, but that are unavailable to you. This usually happens when the seller does not deliver to your country.
           if (priceFoundOnDiscogsElement.parentElement.parentElement.textContent.match(/unavailable/i)) {
-            console.log(`Disc with price ${price} is available on discogs but unavailable to you, skipping...`)
+            console.info(`Disc with price ${price} is available on discogs but unavailable to you, skipping...`)
             return
           }
 
-          prices.add(parseFloat(price))
+          pricesFound++;
+          prices.add(price)
         })
 
       const sortedPrices = Array.from(prices).sort((a, b) => a - b)
-      if (sortedPrices) {
+      if (sortedPrices.length > 0) {
         handlePrices(sortedPrices, releaseId)
       } else {
-        console.error('No prices found on Discogs for release ', releaseId)
+        console.error(`No prices found on Discogs for release '${releaseId}'`)
       }
     } catch (e) {
       console.error(`Discogs search failed (probably, release not found)...`, e)
@@ -335,8 +340,8 @@
         'beforeend',
         `
         <tr>
-          <td title="All available prices: ${sortedPrices.map(d => `$${d}`).join(', ')}">$${lowestPrice.toFixed(2)}</td>
-          <td ${priceAttributes}>$${pricePerGB.toFixed(2)} (${pricePerGBLabel})</td>
+          <td title="All available prices: ${sortedPrices.map(d => currency(d).format()).join(', ')}">${lowestPrice.format()}</td>
+          <td ${priceAttributes}>${currency(pricePerGB).format()} (${pricePerGBLabel})</td>
           <td>
             <a href="${discogsReleaseLink}" target="_blank" style="display: flex; align-items: center;">
               Go to Discogs (${releaseId})
@@ -365,7 +370,7 @@
 
   redAPI(request_id).then(({ response, status }) => {
     if (status !== 'success') {
-      console.log('API request failed; aborting.')
+      console.error('RED API request failed; aborting.')
       return
     }
     if (!response.mediaList.some((r) => DISCOGS_AVAILABLE_MEDIA_TYPES.includes(r)) && response.mediaList != 'Any') {
@@ -386,8 +391,6 @@
       gmc.open()
     }
 
-    console.log('resp', response)
-
     const artist = decodeHTML(response.musicInfo.artists[0]?.name)
     const album = decodeHTML(response.title)
     const year = decodeHTML(response.year)
@@ -400,13 +403,12 @@
       })
 
       Promise.all(promises).then(() => {
-        if (document.querySelectorAll('#pmf_table tr').length == 1) {
+        if (pricesFound == 0) {
           document.getElementById('pmf').innerHTML =
             'Sorry. No items available in the Marketplace for this release on Discogs. 😔'
         }
       })
     } else {
-      console.log('alternative and stuff')
       let alternativeSearches = []
       let manualSearchString = ''
       if (catalogueNumber) {

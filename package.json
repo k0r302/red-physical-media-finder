@@ -1,6 +1,6 @@
 {
   "name": "red-physical-media-finder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Find purchase links, lowest prices and cost per GB for physical media requests on RED.",
   "main": "src/red-rpmf.user.js",
   "scripts": {
