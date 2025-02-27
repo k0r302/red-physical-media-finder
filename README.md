@@ -65,8 +65,11 @@ Please post your bugs and feature requests on the [project's Github page](https:
 
 Changelog
 ---------
+v1.0.2
+- Add pre-set blocklist of Discogs users and also a preference to customize the blocklist by yourself. Thanks @sharky for the suggestion and initial list of bad sellers.
+
 v1.0.1
-- Fix issues with non-US currencies, that would make the user script get stuck on "Searching...". Thanks @beats for reporting.
+- Fix parsing issues with non-US currencies, that would make the user script get stuck on "Searching...". Thanks @beats for reporting.
 
 v1.0.0
 - First release. Supports enhancing the requests.php view page with Discogs lowest price, cost per GB and release link.

@@ -4,7 +4,7 @@
 // @author       k0r302
 // @homepage     https://github.com/k0r302/red-physical-media-finder/
 // @homepageURL  https://github.com/k0r302/red-physical-media-finder/
-// @version      1.0.1
+// @version      1.0.2
 // @grant        GM.xmlHttpRequest
 // @connect      discogs.com
 // @match        https://redacted.sh/requests.php?action=view&id=*
@@ -42,6 +42,8 @@
   const THRESHOLD_3MONEY_LABEL = 'Okay ($$$)'
   const THRESHOLD_4MONEY_LABEL = 'Expensive ($$$$)'
   const THRESHOLD_5MONEY_LABEL = 'Super Expensive ($$$$$)'
+  const DISCOGS_BLOCKED_SELLERS_LABEL = 'Discogs Blocked Sellers'
+  const DISCOGS_BLOCKED_SELLERS_URL_LABEL = 'Discogs Blocked Sellers URL'
 
   const request_id = new URL(window.location).searchParams.get('id')
   const promises = []
@@ -81,6 +83,18 @@
     const parser = new DOMParser()
     return parser.parseFromString(responseText, 'text/html')
   }
+
+  const fetchJSON = async (url) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Failed to fetch JSON:', error);
+    }
+  };
 
   const getBountyInGB = () => {
     const bounty = document.querySelector('#formatted_bounty').textContent.match(/(\d+\.\d+)\s+([GKMT]?i?B)/i)
@@ -177,6 +191,23 @@
         type: 'string',
         default: 'background: #e51f1f; color: #000000;',
       },
+      // Other Values
+      other_discogs_blocked_sellers_url: {
+        label: DISCOGS_BLOCKED_SELLERS_URL_LABEL,
+        type: 'string',
+        default: 'https://gist.githubusercontent.com/k0r302/543cd02874ae3ce622780a762ebfec0f/raw/b9e7fc39efcff6f21a027ca0b1a9e3d6ef378bcf/red-physical-media-finder_discogs-blocked-sellers.json',
+        title: `URL to a JSON file with a list of Discogs sellers to block. This will prevent the script from showing prices from these sellers. If you are using GitHub, use the 'Raw' url.`,
+
+        section: [
+          'Other Settings',
+        ], // Appears above the field
+      },
+      other_discogs_blocked_sellers: {
+        label: DISCOGS_BLOCKED_SELLERS_LABEL,
+        type: 'string',
+        default: '',
+        title: 'Comma (,) separated list of Discogs sellers to block. This list will be merged with the list coming from the URL. This will prevent the script from showing prices from these sellers. Example: seller1, seller2, seller3. Spaces will be ignored.',
+      },
     },
     frameStyle: `inset: 83px auto auto 319px; border: 1px solid rgb(0, 0, 0); height: 550px; margin: 0px; max-height: 95%; max-width: 95%; opacity: 1; overflow: auto; padding: 0px; position: fixed; width: 450px; z-index: 9999; display: block;`,
     css: `
@@ -187,6 +218,15 @@
         padding: 10px;
         width: 400px !important;
         font-family: Arial, sans-serif;
+      }
+      #GM_config label {
+        display: block;
+      }
+      #GM_config label:after {
+        content: ':';
+      }
+      #GM_config input[type="text"] {
+        width: 100%;
       }
       #GM_config .config_header {
         font-size: 18px;
@@ -232,15 +272,45 @@
 
   const gmc = new GM_config(gmcConfig)
 
+  /**
+   * Returns a Set of Discogs sellers that are blocked.
+   * In the future, this can become a thread on RED forums instead of a file on github.
+   * @returns 
+   */
+  const getRedDiscogsBlockedSellers = async () => {
+    // Fetch list of blocked sellers from RED Discogs blocked sellers user github file
+    let redDiscogsBlockedSellers = [];
+    try {
+      let discogsBlockedSellersUrl = gmc.get('other_discogs_blocked_sellers_url');
+      if (discogsBlockedSellersUrl) {
+        let redDiscogsBlockedSellersFetchResponse = await fetchJSON(discogsBlockedSellersUrl);
+        if (redDiscogsBlockedSellersFetchResponse) {
+          redDiscogsBlockedSellers = redDiscogsBlockedSellersFetchResponse;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch RED Discogs blocked sellers:', error);
+    }
+
+    // Fetch list of blocked sellers from GM_config
+    const otherDiscogsBlockedSellers = gmc.get('other_discogs_blocked_sellers').split(',').map(seller => seller.trim());
+    redDiscogsBlockedSellers = redDiscogsBlockedSellers.concat(otherDiscogsBlockedSellers);
+
+    // Return a Set of all blocked sellers
+    return new Set(redDiscogsBlockedSellers.map(seller => seller.toLowerCase()));
+  }
+
   const discogsPrices = async (releaseId, handlePrices) => {
     try {
       const discogsReleaseLink = `${DISCOGS_SELL_RELEASE_URL}/${releaseId}`
+      const discogsBlockedSellers = await getRedDiscogsBlockedSellers();
       const doc = await fetchDOM(discogsReleaseLink)
 
       const prices = new Set()
       doc
         .querySelectorAll(`[data-release-id="${releaseId}"] .item_price .converted_price`)
         .forEach((priceFoundOnDiscogsElement) => {
+          // Fetch price
           const priceString = Array.from(priceFoundOnDiscogsElement.childNodes)
             .filter(node => node.nodeType === Node.TEXT_NODE) // Only get text nodes
             .map(node => node.textContent.trim()) // Trim spaces
@@ -250,6 +320,13 @@
           // Skip all disc prices that are available on discogs, but that are unavailable to you. This usually happens when the seller does not deliver to your country.
           if (priceFoundOnDiscogsElement.parentElement.parentElement.textContent.match(/unavailable/i)) {
             console.info(`Disc with price ${price} is available on discogs but unavailable to you, skipping...`)
+            return
+          }
+
+          // Skip blocked sellers
+          const seller = priceFoundOnDiscogsElement.closest('tr').querySelector('.seller_block a').textContent;
+          if (discogsBlockedSellers.has(seller.trim().toLowerCase())) {
+            console.warn(`Disc with price '${price}' is available on discogs but seller '${seller}' is blocked, skipping...`)
             return
           }
 
